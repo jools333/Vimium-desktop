@@ -1,0 +1,15 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.pdb
+
+# Local executables and binaries
+vimium-desktop.exe
+*.exe
+
+# Local runtime configuration
+vimium_config.txt
+
+# OS metadata
+.DS_Store
+Thumbs.db
