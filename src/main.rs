@@ -18,7 +18,7 @@ use windows::Win32::UI::WindowsAndMessaging::{SW_HIDE, ShowWindow};
 #[command(
     name = "vimium-desktop",
     author = "Antigravity Pair Programmer",
-    version = "0.2.3",
+    version,
     about = "Vimium-style keyboard navigation for desktop applications (Windows & Linux)"
 )]
 struct Cli {
