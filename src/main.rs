@@ -50,6 +50,12 @@ enum Commands {
         #[arg(long)]
         status: bool,
     },
+    /// Check for updates or install the latest release
+    Update {
+        /// Only check for updates without installing
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 fn run_hints(delay_ms: u64) -> Result<()> {
@@ -173,6 +179,49 @@ fn handle_autostart(enable: bool, disable: bool, _status: bool) -> Result<()> {
     Ok(())
 }
 
+fn handle_update(check_only: bool) -> Result<()> {
+    println!(
+        "🔍 Checking for updates (current version: v{})...",
+        env!("CARGO_PKG_VERSION")
+    );
+    match core::updater::check_update()? {
+        Some(info) => {
+            println!(
+                "\n🎉 New version available: {} (current: v{})",
+                info.latest_version, info.current_version
+            );
+            println!(
+                "📦 Asset: {} ({:.2} MB)",
+                info.asset_name,
+                info.asset_size as f64 / (1024.0 * 1024.0)
+            );
+            if !info.notes.trim().is_empty() {
+                println!("\nRelease notes:\n{}", info.notes.trim());
+            }
+
+            if check_only {
+                println!("\n💡 Run 'vimium-desktop update' to download and install this update.");
+                return Ok(());
+            }
+
+            println!("\n⏳ Downloading and applying update...");
+            let updated_path = core::updater::apply_update(&info)?;
+            println!(
+                "✅ Successfully updated to {} at {:?}",
+                info.latest_version, updated_path
+            );
+            println!("Please restart the application to use the new version.");
+        }
+        None => {
+            println!(
+                "✅ You are already running the latest version (v{}).",
+                env!("CARGO_PKG_VERSION")
+            );
+        }
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let delay = cli.delay_ms;
@@ -186,6 +235,7 @@ fn main() -> Result<()> {
             disable,
             status,
         } => handle_autostart(enable, disable, status)?,
+        Commands::Update { check } => handle_update(check)?,
     }
 
     Ok(())

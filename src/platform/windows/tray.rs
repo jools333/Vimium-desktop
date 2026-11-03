@@ -26,6 +26,7 @@ const CMD_HOTKEY_ALT_SEMI: usize = 3004;
 const CMD_HOTKEY_CTRL_SHIFT_F: usize = 3005;
 const CMD_TOGGLE_SKIP_BROWSERS: usize = 3006;
 const CMD_TOGGLE_AUTOSTART: usize = 3007;
+const CMD_CHECK_UPDATE: usize = 3008;
 const CMD_EXIT: usize = 3009;
 
 struct TrayAppState {
@@ -294,6 +295,11 @@ unsafe extern "system" fn tray_wndproc(
                                 },
                             );
                         }
+                        CMD_CHECK_UPDATE => {
+                            std::thread::spawn(move || {
+                                check_and_handle_tray_update();
+                            });
+                        }
                         CMD_EXIT => {
                             PostQuitMessage(0);
                         }
@@ -446,6 +452,18 @@ unsafe fn show_tray_menu(hwnd: HWND) {
         );
 
         let _ = AppendMenuW(hmenu, MF_SEPARATOR, 0, PCWSTR::null());
+        let update_title = "🔄 Проверить обновления..."
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect::<Vec<_>>();
+        let _ = AppendMenuW(
+            hmenu,
+            MF_STRING,
+            CMD_CHECK_UPDATE,
+            PCWSTR(update_title.as_ptr()),
+        );
+
+        let _ = AppendMenuW(hmenu, MF_SEPARATOR, 0, PCWSTR::null());
         let exit_title = "❌ Выход"
             .encode_utf16()
             .chain(std::iter::once(0))
@@ -465,5 +483,118 @@ unsafe fn show_tray_menu(hwnd: HWND) {
 
         let _ = DestroyMenu(hsubmenu);
         let _ = DestroyMenu(hmenu);
+    }
+}
+
+fn check_and_handle_tray_update() {
+    match crate::core::updater::check_update() {
+        Ok(Some(info)) => {
+            let msg = format!(
+                "Доступна новая версия Vimium Desktop: {}\nТекущая версия: v{}\nРазмер: {:.2} MB\n\nХотите скачать и установить обновление сейчас?",
+                info.latest_version,
+                info.current_version,
+                info.asset_size as f64 / (1024.0 * 1024.0)
+            );
+            let wide_msg: Vec<u16> = msg.encode_utf16().chain(std::iter::once(0)).collect();
+            let wide_title: Vec<u16> = "Обновление Vimium Desktop"
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
+
+            let res = unsafe {
+                MessageBoxW(
+                    HWND::default(),
+                    PCWSTR(wide_msg.as_ptr()),
+                    PCWSTR(wide_title.as_ptr()),
+                    MB_YESNO | MB_ICONINFORMATION,
+                )
+            };
+
+            if res == IDYES {
+                match crate::core::updater::apply_update(&info) {
+                    Ok(new_exe) => {
+                        let ok_msg: Vec<u16> =
+                            "Обновление успешно установлено!\nПерезапустить приложение сейчас?"
+                                .encode_utf16()
+                                .chain(std::iter::once(0))
+                                .collect();
+                        let restart = unsafe {
+                            MessageBoxW(
+                                HWND::default(),
+                                PCWSTR(ok_msg.as_ptr()),
+                                PCWSTR(wide_title.as_ptr()),
+                                MB_YESNO | MB_ICONINFORMATION,
+                            )
+                        };
+                        if restart == IDYES {
+                            let exe_wide: Vec<u16> = new_exe
+                                .to_string_lossy()
+                                .encode_utf16()
+                                .chain(std::iter::once(0))
+                                .collect();
+                            unsafe {
+                                let _ = ShellExecuteW(
+                                    HWND::default(),
+                                    w!("open"),
+                                    PCWSTR(exe_wide.as_ptr()),
+                                    PCWSTR::null(),
+                                    PCWSTR::null(),
+                                    SW_SHOW,
+                                );
+                                PostQuitMessage(0);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        let err_msg = format!("Ошибка при установке обновления:\n{}", e);
+                        let wide_err: Vec<u16> =
+                            err_msg.encode_utf16().chain(std::iter::once(0)).collect();
+                        unsafe {
+                            MessageBoxW(
+                                HWND::default(),
+                                PCWSTR(wide_err.as_ptr()),
+                                PCWSTR(wide_title.as_ptr()),
+                                MB_OK | MB_ICONERROR,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        Ok(None) => {
+            let msg = format!(
+                "У вас установлена самая актуальная версия (v{}).\nОбновлений не требуется.",
+                env!("CARGO_PKG_VERSION")
+            );
+            let wide_msg: Vec<u16> = msg.encode_utf16().chain(std::iter::once(0)).collect();
+            let wide_title: Vec<u16> = "Обновление Vimium Desktop"
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
+            unsafe {
+                MessageBoxW(
+                    HWND::default(),
+                    PCWSTR(wide_msg.as_ptr()),
+                    PCWSTR(wide_title.as_ptr()),
+                    MB_OK | MB_ICONINFORMATION,
+                );
+            }
+        }
+        Err(e) => {
+            let msg = format!("Не удалось проверить обновления:\n{}", e);
+            let wide_msg: Vec<u16> = msg.encode_utf16().chain(std::iter::once(0)).collect();
+            let wide_title: Vec<u16> = "Ошибка проверки обновлений"
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
+            unsafe {
+                MessageBoxW(
+                    HWND::default(),
+                    PCWSTR(wide_msg.as_ptr()),
+                    PCWSTR(wide_title.as_ptr()),
+                    MB_OK | MB_ICONWARNING,
+                );
+            }
+        }
     }
 }
