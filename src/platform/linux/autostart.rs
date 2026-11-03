@@ -50,10 +50,8 @@ pub fn set_autostart(enable: bool) -> Result<()> {
 
         fs::write(&desktop_path, content)
             .with_context(|| format!("Failed to write desktop entry to {:?}", desktop_path))?;
-    } else {
-        if desktop_path.exists() {
-            let _ = fs::remove_file(&desktop_path);
-        }
+    } else if desktop_path.exists() {
+        let _ = fs::remove_file(&desktop_path);
     }
 
     Ok(())

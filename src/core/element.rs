@@ -6,6 +6,7 @@ pub struct Rect {
     pub height: i32,
 }
 
+#[allow(dead_code)]
 impl Rect {
     pub fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
         Self {
@@ -34,6 +35,7 @@ pub struct UIElement {
     pub rect: Rect,
 }
 
+#[allow(dead_code)]
 impl UIElement {
     pub fn new(id: usize, name: impl Into<String>, role: impl Into<String>, rect: Rect) -> Self {
         Self {

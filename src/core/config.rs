@@ -10,6 +10,7 @@ pub enum HotkeyPreset {
     CtrlShiftF,
 }
 
+#[allow(dead_code)]
 impl HotkeyPreset {
     pub fn name(&self) -> &'static str {
         match self {
