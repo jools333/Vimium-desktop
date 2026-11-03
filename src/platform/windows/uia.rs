@@ -1,12 +1,12 @@
 use anyhow::{Context, Result};
 use std::collections::HashSet;
-use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::System::Com::*;
 use windows::Win32::System::StationsAndDesktops::*;
 use windows::Win32::System::Threading::*;
 use windows::Win32::UI::Accessibility::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
 
 use crate::core::element::{Rect, UIElement};
 use crate::platform::AccessibilityBackend;
@@ -68,11 +68,20 @@ impl WindowsUia {
             let mut pid = 0u32;
             GetWindowThreadProcessId(hwnd, Some(&mut pid));
             if pid > 0 {
-                if let Ok(handle) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+                let open_res = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+                if let Ok(handle) = open_res {
                     let mut img_buf = [0u16; 512];
                     let mut size = img_buf.len() as u32;
-                    if QueryFullProcessImageNameW(handle, PROCESS_NAME_FORMAT(0), PWSTR(img_buf.as_mut_ptr()), &mut size).is_ok() {
-                        let img_str = String::from_utf16_lossy(&img_buf[..size as usize]).to_lowercase();
+                    if QueryFullProcessImageNameW(
+                        handle,
+                        PROCESS_NAME_FORMAT(0),
+                        PWSTR(img_buf.as_mut_ptr()),
+                        &mut size,
+                    )
+                    .is_ok()
+                    {
+                        let img_str =
+                            String::from_utf16_lossy(&img_buf[..size as usize]).to_lowercase();
                         let _ = CloseHandle(handle);
                         return img_str.ends_with("chrome.exe")
                             || img_str.ends_with("msedge.exe")
@@ -127,10 +136,11 @@ impl WindowsUia {
             };
 
             // Single IPC call to fetch entire element tree with all properties cached
-            let elements_array = match root.FindAllBuildCache(TreeScope_Descendants, &self.cond, &self.cache) {
-                Ok(arr) => arr,
-                Err(_) => return Ok(()),
-            };
+            let elements_array =
+                match root.FindAllBuildCache(TreeScope_Descendants, &self.cond, &self.cache) {
+                    Ok(arr) => arr,
+                    Err(_) => return Ok(()),
+                };
 
             let count = elements_array.Length().unwrap_or(0);
 
@@ -188,7 +198,18 @@ impl WindowsUia {
                     // 50024: TreeItem, 50031: SplitButton, 50035: HeaderItem
                     let is_interactive = matches!(
                         ctrl_type_id,
-                        50000 | 50002 | 50003 | 50004 | 50005 | 50007 | 50011 | 50013 | 50019 | 50024 | 50031 | 50035
+                        50000
+                            | 50002
+                            | 50003
+                            | 50004
+                            | 50005
+                            | 50007
+                            | 50011
+                            | 50013
+                            | 50019
+                            | 50024
+                            | 50031
+                            | 50035
                     );
 
                     // Skip generic container types without interactive flag
@@ -202,12 +223,14 @@ impl WindowsUia {
                     let is_selectable = elem.GetCachedPattern(UIA_SelectionItemPatternId).is_ok();
                     let is_expandable = elem.GetCachedPattern(UIA_ExpandCollapsePatternId).is_ok();
 
-                    let is_clickable = is_interactive || is_invokable || is_toggleable || is_selectable || is_expandable;
+                    let is_clickable = is_interactive
+                        || is_invokable
+                        || is_toggleable
+                        || is_selectable
+                        || is_expandable;
 
-                    if !is_clickable {
-                        if name.is_empty() || w > 600 || h > 150 {
-                            continue;
-                        }
+                    if !is_clickable && (name.is_empty() || w > 600 || h > 150) {
+                        continue;
                     }
                 }
 
@@ -247,7 +270,11 @@ impl WindowsUia {
     /// Scans active window AND the system taskbar + tray simultaneously.
     /// If `skip_browsers` is true and `target_hwnd` is a browser (Chrome, Edge, Yandex, etc.),
     /// the browser's huge DOM tree is skipped, keeping only the Taskbar and Tray for instant response!
-    pub fn get_elements_for_window(&self, target_hwnd: HWND, skip_browsers: bool) -> Result<Vec<UIElement>> {
+    pub fn get_elements_for_window(
+        &self,
+        target_hwnd: HWND,
+        skip_browsers: bool,
+    ) -> Result<Vec<UIElement>> {
         let mut results = Vec::with_capacity(128);
         let mut seen_rects = HashSet::with_capacity(256);
 
@@ -258,7 +285,12 @@ impl WindowsUia {
             if !target_hwnd.0.is_null() && target_hwnd != tray_hwnd {
                 let is_browser = skip_browsers && Self::is_browser_window(target_hwnd);
                 if !is_browser {
-                    let _ = self.scan_window_elements(target_hwnd, false, &mut results, &mut seen_rects);
+                    let _ = self.scan_window_elements(
+                        target_hwnd,
+                        false,
+                        &mut results,
+                        &mut seen_rects,
+                    );
                 }
             }
 
@@ -268,7 +300,8 @@ impl WindowsUia {
             }
 
             // 3. Scan secondary taskbar (multi-monitor setups) if present
-            let sec_tray = FindWindowW(w!("Shell_SecondaryTrayWnd"), None).unwrap_or(HWND::default());
+            let sec_tray =
+                FindWindowW(w!("Shell_SecondaryTrayWnd"), None).unwrap_or(HWND::default());
             if !sec_tray.0.is_null() && sec_tray != tray_hwnd {
                 let _ = self.scan_window_elements(sec_tray, true, &mut results, &mut seen_rects);
             }

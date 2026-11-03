@@ -4,9 +4,9 @@ pub mod overlay;
 pub mod tray;
 pub mod uia;
 
-use anyhow::Result;
 use crate::core::element::{HintItem, UIElement};
 use crate::platform::{AccessibilityBackend, MouseBackend, OverlayBackend};
+use anyhow::Result;
 
 pub use tray::TrayApplication;
 

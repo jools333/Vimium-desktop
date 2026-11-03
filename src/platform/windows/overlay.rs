@@ -1,10 +1,10 @@
 use anyhow::Result;
 use std::sync::atomic::{AtomicBool, Ordering};
-use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Input::KeyboardAndMouse::{SetFocus, VK_BACK, VK_ESCAPE};
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
 
 use crate::core::element::{HintItem, UIElement};
 use crate::core::hint::{HintMatcher, MatchResult};
@@ -50,11 +50,7 @@ impl WindowsOverlay {
 
 // Low-level keyboard hook: intercepts physical keystrokes across the ENTIRE system
 // completely independent of window focus or active keyboard layout (Russian/English)
-unsafe extern "system" fn ll_keyboard_hook(
-    code: i32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
+unsafe extern "system" fn ll_keyboard_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     unsafe {
         if code >= 0 && (wparam.0 == WM_KEYDOWN as usize || wparam.0 == WM_SYSKEYDOWN as usize) {
             let kb = &*(lparam.0 as *const KBDLLHOOKSTRUCT);
@@ -270,9 +266,20 @@ impl OverlayBackend for WindowsOverlay {
             let border_pen = CreatePen(PS_SOLID, 1, COLORREF(0x001A1A1A));
             // Bold sans-serif font
             let font = CreateFontW(
-                15, 0, 0, 0, FW_BOLD.0 as i32, 0, 0, 0,
-                DEFAULT_CHARSET.0 as u32, OUT_DEFAULT_PRECIS.0 as u32, CLIP_DEFAULT_PRECIS.0 as u32,
-                CLEARTYPE_QUALITY.0 as u32, DEFAULT_PITCH.0 as u32, w!("Segoe UI"),
+                15,
+                0,
+                0,
+                0,
+                FW_BOLD.0 as i32,
+                0,
+                0,
+                0,
+                DEFAULT_CHARSET.0 as u32,
+                OUT_DEFAULT_PRECIS.0 as u32,
+                CLIP_DEFAULT_PRECIS.0 as u32,
+                CLEARTYPE_QUALITY.0 as u32,
+                DEFAULT_PITCH.0 as u32,
+                w!("Segoe UI"),
             );
 
             let mut state = OverlayState {
@@ -328,7 +335,10 @@ impl OverlayBackend for WindowsOverlay {
             let _ = SetFocus(hwnd);
 
             // Modal message pump for overlay: exits when is_closed is true
-            while !state.is_closed {
+            loop {
+                if state.is_closed {
+                    break;
+                }
                 let mut msg = MSG::default();
                 let ret = GetMessageW(&mut msg, None, 0, 0);
                 if !ret.as_bool() || msg.message == WM_QUIT {

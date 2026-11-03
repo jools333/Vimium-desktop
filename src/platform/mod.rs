@@ -1,5 +1,5 @@
-use anyhow::Result;
 use crate::core::element::{HintItem, UIElement};
+use anyhow::Result;
 
 pub trait AccessibilityBackend {
     /// Retrieve interactive/clickable elements from active window or desktop

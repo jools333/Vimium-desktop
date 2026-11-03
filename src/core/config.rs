@@ -20,11 +20,11 @@ impl HotkeyPreset {
         }
     }
 
-    pub fn to_win32_modifiers_and_vk(&self) -> (u32, u32) {
+    pub fn to_win32_modifiers_and_vk(self) -> (u32, u32) {
         // Win32 modifiers: MOD_ALT = 0x0001, MOD_CONTROL = 0x0002, MOD_SHIFT = 0x0004, MOD_NOREPEAT = 0x4000
         match self {
-            HotkeyPreset::AltF => (0x0001 | 0x4000, 0x46),         // Alt + 'F'
-            HotkeyPreset::AltSpace => (0x0001 | 0x4000, 0x20),     // Alt + VK_SPACE
+            HotkeyPreset::AltF => (0x0001 | 0x4000, 0x46), // Alt + 'F'
+            HotkeyPreset::AltSpace => (0x0001 | 0x4000, 0x20), // Alt + VK_SPACE
             HotkeyPreset::AltSemicolon => (0x0001 | 0x4000, 0xBA), // Alt + VK_OEM_1 (;)
             HotkeyPreset::CtrlShiftF => (0x0002 | 0x0004 | 0x4000, 0x46), // Ctrl + Shift + 'F'
         }
@@ -39,7 +39,7 @@ impl HotkeyPreset {
         }
     }
 
-    pub fn to_id(&self) -> usize {
+    pub fn to_id(self) -> usize {
         match self {
             HotkeyPreset::AltF => 0,
             HotkeyPreset::AltSpace => 1,
@@ -79,20 +79,14 @@ impl AppConfig {
         if let Ok(content) = fs::read_to_string(&path) {
             let lines: Vec<&str> = content.lines().collect();
             let mut cfg = Self::default();
-            if let Some(l0) = lines.first() {
-                if let Ok(id) = l0.trim().parse::<usize>() {
-                    cfg.preset = HotkeyPreset::from_id(id);
-                }
+            if let Some(Ok(id)) = lines.first().map(|s| s.trim().parse::<usize>()) {
+                cfg.preset = HotkeyPreset::from_id(id);
             }
-            if let Some(l1) = lines.get(1) {
-                if let Ok(skip) = l1.trim().parse::<bool>() {
-                    cfg.skip_browsers = skip;
-                }
+            if let Some(Ok(skip)) = lines.get(1).map(|s| s.trim().parse::<bool>()) {
+                cfg.skip_browsers = skip;
             }
-            if let Some(l2) = lines.get(2) {
-                if let Ok(auto) = l2.trim().parse::<bool>() {
-                    cfg.autostart = auto;
-                }
+            if let Some(Ok(auto)) = lines.get(2).map(|s| s.trim().parse::<bool>()) {
+                cfg.autostart = auto;
             }
             return cfg;
         }
@@ -101,7 +95,12 @@ impl AppConfig {
 
     pub fn save(&self) {
         let path = Self::config_path();
-        let content = format!("{}\n{}\n{}", self.preset.to_id(), self.skip_browsers, self.autostart);
+        let content = format!(
+            "{}\n{}\n{}",
+            self.preset.to_id(),
+            self.skip_browsers,
+            self.autostart
+        );
         let _ = fs::write(path, content);
     }
 }

@@ -1,9 +1,9 @@
 use anyhow::Result;
-use windows::core::w;
 use windows::Win32::System::Registry::{
-    RegCloseKey, RegDeleteValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
-    HKEY, HKEY_CURRENT_USER, KEY_READ, KEY_WRITE, REG_SZ,
+    HKEY, HKEY_CURRENT_USER, KEY_READ, KEY_WRITE, REG_SZ, RegCloseKey, RegDeleteValueW,
+    RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
 };
+use windows::core::w;
 
 const RUN_KEY: &windows::core::PCWSTR = &w!("Software\\Microsoft\\Windows\\CurrentVersion\\Run");
 const APP_NAME: &windows::core::PCWSTR = &w!("VimiumDesktop");
@@ -45,13 +45,7 @@ pub fn set_autostart(enable: bool) -> Result<()> {
                 wide_val.len() * std::mem::size_of::<u16>(),
             );
 
-            let res = RegSetValueExW(
-                hkey,
-                *APP_NAME,
-                0,
-                REG_SZ,
-                Some(byte_slice),
-            );
+            let res = RegSetValueExW(hkey, *APP_NAME, 0, REG_SZ, Some(byte_slice));
             let _ = RegCloseKey(hkey);
             res.ok()?;
         } else {

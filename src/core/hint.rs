@@ -2,9 +2,8 @@ use crate::core::element::{HintItem, UIElement};
 
 /// Alphabet of comfortable keys for hint generation (home row + nearby keys)
 pub const DEFAULT_HINT_KEYS: &[char] = &[
-    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l',
-    'q', 'w', 'e', 'r', 'u', 'i', 'o', 'p',
-    'z', 'x', 'c', 'v', 'b', 'n', 'm',
+    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'q', 'w', 'e', 'r', 'u', 'i', 'o', 'p', 'z', 'x',
+    'c', 'v', 'b', 'n', 'm',
 ];
 
 /// Converts Russian Cyrillic keyboard characters to their English QWERTY equivalents
@@ -186,8 +185,14 @@ mod tests {
         let elem1 = UIElement::new(0, "Btn1", "Button", Rect::new(0, 0, 10, 10));
         let elem2 = UIElement::new(1, "Btn2", "Button", Rect::new(20, 20, 10, 10));
         let items = vec![
-            HintItem { hint: "as".to_string(), element: elem1 },
-            HintItem { hint: "ad".to_string(), element: elem2 },
+            HintItem {
+                hint: "as".to_string(),
+                element: elem1,
+            },
+            HintItem {
+                hint: "ad".to_string(),
+                element: elem2,
+            },
         ];
 
         let mut matcher = HintMatcher::new(items);
@@ -195,6 +200,9 @@ mod tests {
         assert_eq!(matcher.feed_char('ф'), MatchResult::Narrowed(2));
         assert_eq!(matcher.feed_char('z'), MatchResult::Mismatch);
         // Test typing Russian 'ы' -> maps to 's'
-        assert_eq!(matcher.feed_char('ы'), MatchResult::Selected(matcher.items[0].element.clone()));
+        assert_eq!(
+            matcher.feed_char('ы'),
+            MatchResult::Selected(matcher.items[0].element.clone())
+        );
     }
 }

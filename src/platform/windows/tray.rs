@@ -1,11 +1,11 @@
 use anyhow::Result;
-use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::System::Com::*;
 use windows::Win32::System::Threading::CreateMutexW;
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
+use windows::core::*;
 
 use crate::core::config::{AppConfig, HotkeyPreset};
 use crate::core::hint::assign_hints;
@@ -50,7 +50,8 @@ impl TrayApplication {
             // Ensure only one instance of Vimium Desktop runs at a time
             let mutex_name = w!("Local\\VimiumDesktopSingleInstanceMutex");
             if let Ok(m) = CreateMutexW(None, true, mutex_name) {
-                if GetLastError() == ERROR_ALREADY_EXISTS {
+                let already_exists = GetLastError() == ERROR_ALREADY_EXISTS;
+                if already_exists {
                     eprintln!("Vimium Desktop is already running in background.");
                     let _ = CloseHandle(m);
                     return Ok(());
@@ -112,10 +113,15 @@ impl TrayApplication {
             }
 
             // Balloon notification on start
-            let info_title = "Vimium Desktop активен".encode_utf16().collect::<Vec<u16>>();
-            let info_text = format!("Нажмите {} в любом окне для навигации", config.preset.name())
+            let info_title = "Vimium Desktop активен"
                 .encode_utf16()
                 .collect::<Vec<u16>>();
+            let info_text = format!(
+                "Нажмите {} в любом окне для навигации",
+                config.preset.name()
+            )
+            .encode_utf16()
+            .collect::<Vec<u16>>();
             for (i, &ch) in info_title.iter().enumerate().take(63) {
                 nid.szInfoTitle[i] = ch;
             }
@@ -167,7 +173,11 @@ fn register_current_hotkey(hwnd: HWND, preset: HotkeyPreset) {
         let _ = UnregisterHotKey(hwnd, HOTKEY_ID);
         let res = RegisterHotKey(hwnd, HOTKEY_ID, HOT_KEY_MODIFIERS(mods), vk);
         if let Err(e) = res {
-            eprintln!("Warning: Failed to register hotkey {}: {:?}", preset.name(), e);
+            eprintln!(
+                "Warning: Failed to register hotkey {}: {:?}",
+                preset.name(),
+                e
+            );
         }
     }
 }
@@ -183,7 +193,10 @@ fn trigger_vimium_hints() {
 
         // 1. High-speed scan: active window + taskbar (sound, clock, start, apps)
         // Automatically skips browsers if skip_browsers is enabled!
-        let elements = match state.uia.get_elements_for_window(fg, state.config.skip_browsers) {
+        let elements = match state
+            .uia
+            .get_elements_for_window(fg, state.config.skip_browsers)
+        {
             Ok(elems) if !elems.is_empty() => elems,
             _ => return,
         };
@@ -223,7 +236,7 @@ unsafe extern "system" fn tray_wndproc(
                 LRESULT(0)
             }
             WM_COMMAND => {
-                let cmd_id = (wparam.0 & 0xFFFF) as usize;
+                let cmd_id = wparam.0 & 0xFFFF;
                 if !APP_STATE_PTR.is_null() {
                     let state = &mut *APP_STATE_PTR;
                     match cmd_id {
@@ -338,15 +351,21 @@ unsafe fn show_tray_menu(hwnd: HWND) {
         let mut cursor_pos = POINT::default();
         let _ = GetCursorPos(&mut cursor_pos);
 
-        let hmenu = CreatePopupMenu().unwrap_or(HMENU::default());
-        let hsubmenu = CreatePopupMenu().unwrap_or(HMENU::default());
+        let hmenu = CreatePopupMenu().unwrap_or_default();
+        let hsubmenu = CreatePopupMenu().unwrap_or_default();
 
         let trigger_text = format!("🎯 Вызвать подсказки ({})", state.config.preset.name());
         let _ = AppendMenuW(
             hmenu,
             MF_STRING,
             CMD_TRIGGER,
-            PCWSTR(trigger_text.encode_utf16().chain(std::iter::once(0)).collect::<Vec<_>>().as_ptr()),
+            PCWSTR(
+                trigger_text
+                    .encode_utf16()
+                    .chain(std::iter::once(0))
+                    .collect::<Vec<_>>()
+                    .as_ptr(),
+            ),
         );
         let _ = AppendMenuW(hmenu, MF_SEPARATOR, 0, PCWSTR::null());
 
@@ -357,17 +376,40 @@ unsafe fn show_tray_menu(hwnd: HWND) {
             } else {
                 MF_STRING
             };
-            let wide = label.encode_utf16().chain(std::iter::once(0)).collect::<Vec<_>>();
+            let wide = label
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect::<Vec<_>>();
             let _ = AppendMenuW(hsubmenu, flags, cmd, PCWSTR(wide.as_ptr()));
         };
 
-        check_item(HotkeyPreset::AltF, CMD_HOTKEY_ALT_F, "Alt + F (По умолчанию)");
+        check_item(
+            HotkeyPreset::AltF,
+            CMD_HOTKEY_ALT_F,
+            "Alt + F (По умолчанию)",
+        );
         check_item(HotkeyPreset::AltSpace, CMD_HOTKEY_ALT_SPACE, "Alt + Пробел");
-        check_item(HotkeyPreset::AltSemicolon, CMD_HOTKEY_ALT_SEMI, "Alt + ; (Hunt-n-Peck)");
-        check_item(HotkeyPreset::CtrlShiftF, CMD_HOTKEY_CTRL_SHIFT_F, "Ctrl + Shift + F");
+        check_item(
+            HotkeyPreset::AltSemicolon,
+            CMD_HOTKEY_ALT_SEMI,
+            "Alt + ; (Hunt-n-Peck)",
+        );
+        check_item(
+            HotkeyPreset::CtrlShiftF,
+            CMD_HOTKEY_CTRL_SHIFT_F,
+            "Ctrl + Shift + F",
+        );
 
-        let submenu_title = "⚙️ Выбрать горячую клавишу".encode_utf16().chain(std::iter::once(0)).collect::<Vec<_>>();
-        let _ = AppendMenuW(hmenu, MF_POPUP, hsubmenu.0 as usize, PCWSTR(submenu_title.as_ptr()));
+        let submenu_title = "⚙️ Выбрать горячую клавишу"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect::<Vec<_>>();
+        let _ = AppendMenuW(
+            hmenu,
+            MF_POPUP,
+            hsubmenu.0 as usize,
+            PCWSTR(submenu_title.as_ptr()),
+        );
 
         // Browser toggle option
         let browser_flags = if state.config.skip_browsers {
@@ -375,8 +417,16 @@ unsafe fn show_tray_menu(hwnd: HWND) {
         } else {
             MF_STRING
         };
-        let browser_title = "⚡ Пропускать браузеры (Chrome, Edge и др.)".encode_utf16().chain(std::iter::once(0)).collect::<Vec<_>>();
-        let _ = AppendMenuW(hmenu, browser_flags, CMD_TOGGLE_SKIP_BROWSERS, PCWSTR(browser_title.as_ptr()));
+        let browser_title = "⚡ Пропускать браузеры (Chrome, Edge и др.)"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect::<Vec<_>>();
+        let _ = AppendMenuW(
+            hmenu,
+            browser_flags,
+            CMD_TOGGLE_SKIP_BROWSERS,
+            PCWSTR(browser_title.as_ptr()),
+        );
 
         // Autostart toggle option
         let autostart_flags = if state.config.autostart {
@@ -384,11 +434,22 @@ unsafe fn show_tray_menu(hwnd: HWND) {
         } else {
             MF_STRING
         };
-        let autostart_title = "🚀 Автозапуск при старте Windows".encode_utf16().chain(std::iter::once(0)).collect::<Vec<_>>();
-        let _ = AppendMenuW(hmenu, autostart_flags, CMD_TOGGLE_AUTOSTART, PCWSTR(autostart_title.as_ptr()));
+        let autostart_title = "🚀 Автозапуск при старте Windows"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect::<Vec<_>>();
+        let _ = AppendMenuW(
+            hmenu,
+            autostart_flags,
+            CMD_TOGGLE_AUTOSTART,
+            PCWSTR(autostart_title.as_ptr()),
+        );
 
         let _ = AppendMenuW(hmenu, MF_SEPARATOR, 0, PCWSTR::null());
-        let exit_title = "❌ Выход".encode_utf16().chain(std::iter::once(0)).collect::<Vec<_>>();
+        let exit_title = "❌ Выход"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect::<Vec<_>>();
         let _ = AppendMenuW(hmenu, MF_STRING, CMD_EXIT, PCWSTR(exit_title.as_ptr()));
 
         let _ = SetForegroundWindow(hwnd);

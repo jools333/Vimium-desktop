@@ -33,8 +33,7 @@ pub fn set_autostart(enable: bool) -> Result<()> {
                 .with_context(|| format!("Failed to create autostart directory: {:?}", parent))?;
         }
 
-        let exe_path = std::env::current_exe()
-            .context("Failed to get current executable path")?;
+        let exe_path = std::env::current_exe().context("Failed to get current executable path")?;
 
         let content = format!(
             "[Desktop Entry]\n\

@@ -1,8 +1,8 @@
-use anyhow::Result;
-use std::io::{self, Write};
 use crate::core::element::{HintItem, UIElement};
 use crate::core::hint::{HintMatcher, MatchResult};
 use crate::platform::OverlayBackend;
+use anyhow::Result;
+use std::io::{self, Write};
 
 pub struct LinuxOverlay;
 

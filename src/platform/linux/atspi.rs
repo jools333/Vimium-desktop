@@ -1,6 +1,6 @@
-use anyhow::Result;
 use crate::core::element::UIElement;
 use crate::platform::AccessibilityBackend;
+use anyhow::Result;
 
 pub struct LinuxAtspi;
 
@@ -20,13 +20,15 @@ impl LinuxAtspi {
 
         // 2. Query session bus for org.a11y.Bus
         if let Ok(conn) = zbus::blocking::Connection::session() {
-            let reply: Result<String, _> = conn.call_method(
-                Some("org.a11y.Bus"),
-                "/org/a11y/bus",
-                Some("org.a11y.Bus"),
-                "GetAddress",
-                &(),
-            ).and_then(|m| m.body().deserialize());
+            let reply: Result<String, _> = conn
+                .call_method(
+                    Some("org.a11y.Bus"),
+                    "/org/a11y/bus",
+                    Some("org.a11y.Bus"),
+                    "GetAddress",
+                    &(),
+                )
+                .and_then(|m| m.body().deserialize());
 
             if let Ok(addr) = reply {
                 return Some(addr);
@@ -48,14 +50,15 @@ impl AccessibilityBackend for LinuxAtspi {
             if let Ok(builder) = zbus::blocking::connection::Builder::address(addr.as_str()) {
                 if let Ok(conn) = builder.build() {
                     // Query accessible applications from root
-                    let reply: zbus::Result<Vec<(String, zbus::zvariant::OwnedObjectPath)>> =
-                        conn.call_method(
+                    let reply: zbus::Result<Vec<(String, zbus::zvariant::OwnedObjectPath)>> = conn
+                        .call_method(
                             Some("org.a11y.atspi.Registry"),
                             "/org/a11y/atspi/accessible/root",
                             Some("org.a11y.atspi.Socket"),
                             "Embed",
                             &(),
-                        ).and_then(|m| m.body().deserialize());
+                        )
+                        .and_then(|m| m.body().deserialize());
 
                     let _ = reply;
                 }

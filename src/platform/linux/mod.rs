@@ -3,9 +3,9 @@ pub mod autostart;
 pub mod mouse;
 pub mod overlay;
 
-use anyhow::Result;
 use crate::core::element::{HintItem, UIElement};
 use crate::platform::{AccessibilityBackend, MouseBackend, OverlayBackend};
+use anyhow::Result;
 
 pub struct Platform;
 

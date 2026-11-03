@@ -12,7 +12,7 @@ use crate::platform::{AccessibilityBackend, MouseBackend, OverlayBackend, Platfo
 #[cfg(windows)]
 use windows::Win32::System::Console::GetConsoleWindow;
 #[cfg(windows)]
-use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
+use windows::Win32::UI::WindowsAndMessaging::{SW_HIDE, ShowWindow};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -54,7 +54,10 @@ enum Commands {
 
 fn run_hints(delay_ms: u64) -> Result<()> {
     if delay_ms > 0 {
-        println!("⏳ Waiting {} ms... Please switch to your target window!", delay_ms);
+        println!(
+            "⏳ Waiting {} ms... Please switch to your target window!",
+            delay_ms
+        );
         thread::sleep(Duration::from_millis(delay_ms));
     }
 
@@ -68,7 +71,10 @@ fn run_hints(delay_ms: u64) -> Result<()> {
         return Ok(());
     }
 
-    println!("✨ Found {} interactive elements. Generating hints...", elements.len());
+    println!(
+        "✨ Found {} interactive elements. Generating hints...",
+        elements.len()
+    );
     let hints = assign_hints(elements);
 
     println!("⌨️ Launching Vimium overlay (type letters to click, Esc to cancel)...");
@@ -96,7 +102,10 @@ fn run_scan(delay_ms: u64) -> Result<()> {
     let platform = Platform::new();
     let elements = platform.get_interactive_elements()?;
 
-    println!("\n=== DETECTED INTERACTIVE ELEMENTS (Count: {}) ===", elements.len());
+    println!(
+        "\n=== DETECTED INTERACTIVE ELEMENTS (Count: {}) ===",
+        elements.len()
+    );
     let hints = assign_hints(elements);
     for item in hints {
         println!(
@@ -154,7 +163,11 @@ fn handle_autostart(enable: bool, disable: bool, _status: bool) -> Result<()> {
         let is_on = platform::autostart::is_autostart_enabled();
         println!(
             "Vimium Desktop autostart status: {}",
-            if is_on { "ENABLED (Active)" } else { "DISABLED" }
+            if is_on {
+                "ENABLED (Active)"
+            } else {
+                "DISABLED"
+            }
         );
     }
     Ok(())
@@ -168,7 +181,11 @@ fn main() -> Result<()> {
         Commands::Tray => run_tray()?,
         Commands::Scan => run_scan(delay)?,
         Commands::Hints => run_hints(delay)?,
-        Commands::Autostart { enable, disable, status } => handle_autostart(enable, disable, status)?,
+        Commands::Autostart {
+            enable,
+            disable,
+            status,
+        } => handle_autostart(enable, disable, status)?,
     }
 
     Ok(())
