@@ -19,6 +19,66 @@ pub struct WindowsUia {
 }
 
 impl WindowsUia {
+    /// Programmatically activates the element at the specified coordinates without moving the mouse cursor.
+    /// Returns Ok(true) if successfully triggered via UI Automation patterns (Invoke, Select, Toggle, SetFocus),
+    /// or Ok(false) if the control does not support programmatic activation.
+    pub fn activate_at(&self, x: i32, y: i32) -> Result<bool> {
+        unsafe {
+            let point = POINT { x, y };
+            let elem = match self.uia.ElementFromPoint(point) {
+                Ok(e) => e,
+                Err(_) => return Ok(false),
+            };
+
+            // 1. Try InvokePattern (buttons, links, menu items)
+            if let Ok(pattern) = elem.GetCurrentPattern(UIA_InvokePatternId) {
+                if let Ok(invoke) = pattern.cast::<IUIAutomationInvokePattern>() {
+                    if invoke.Invoke().is_ok() {
+                        return Ok(true);
+                    }
+                }
+            }
+
+            // 2. Try SelectionItemPattern (tabs, list items, radio buttons)
+            if let Ok(pattern) = elem.GetCurrentPattern(UIA_SelectionItemPatternId) {
+                if let Ok(sel) = pattern.cast::<IUIAutomationSelectionItemPattern>() {
+                    if sel.Select().is_ok() {
+                        return Ok(true);
+                    }
+                }
+            }
+
+            // 3. Try TogglePattern (checkboxes, toggle buttons)
+            if let Ok(pattern) = elem.GetCurrentPattern(UIA_TogglePatternId) {
+                if let Ok(toggle) = pattern.cast::<IUIAutomationTogglePattern>() {
+                    if toggle.Toggle().is_ok() {
+                        return Ok(true);
+                    }
+                }
+            }
+
+            // 4. Try ExpandCollapsePattern (drop-downs, expandable tree items)
+            if let Ok(pattern) = elem.GetCurrentPattern(UIA_ExpandCollapsePatternId) {
+                if let Ok(expand) = pattern.cast::<IUIAutomationExpandCollapsePattern>() {
+                    if expand.Expand().is_ok() {
+                        return Ok(true);
+                    }
+                }
+            }
+
+            // 5. Try SetFocus (for edit controls / address bars)
+            let ctrl_type_id = elem.CurrentControlType().map(|c| c.0).unwrap_or(0);
+            if ctrl_type_id == 50004 {
+                // UIA_EditControlTypeId
+                if elem.SetFocus().is_ok() {
+                    return Ok(true);
+                }
+            }
+
+            Ok(false)
+        }
+    }
+
     pub fn new() -> Result<Self> {
         Self::ensure_desktop_access();
 

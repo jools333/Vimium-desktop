@@ -211,6 +211,10 @@ fn trigger_vimium_hints() {
         let mut overlay = WindowsOverlay::new();
         if let Ok(Some(selected)) = overlay.show_overlay(&hints) {
             let (cx, cy) = selected.rect.center();
+            // Fast path: try programmatic UIA activation first (cursor does not move at all)
+            if let Ok(true) = state.uia.activate_at(cx, cy) {
+                return;
+            }
             let mouse = WindowsMouse::new();
             let _ = mouse.click_at(cx, cy);
         }
