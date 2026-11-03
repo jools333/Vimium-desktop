@@ -73,3 +73,13 @@
   # Проверить статус
   .\vimium-desktop\vimium-desktop.exe autostart --status
   ```
+
+- **Автообновление (проверка и установка новых версий с GitHub)**:
+  ```powershell
+  # Проверить наличие обновлений
+  .\vimium-desktop\vimium-desktop.exe update --check
+
+  # Скачать и установить последнее обновление
+  .\vimium-desktop\vimium-desktop.exe update
+  ```
+  *(На Windows обновление также можно выполнить в 1 клик через контекстное меню в системном трее: «Проверить обновления...»)*
