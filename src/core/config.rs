@@ -51,9 +51,44 @@ impl HotkeyPreset {
 }
 
 #[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BrowserMode {
+    TabsAndToolbar, // 0: Tabs, Address bar, Navigation toolbar (Web page excluded) - DEFAULT
+    SkipAll,        // 1: Skip browser completely
+    Full,           // 2: Scan everything including webpage DOM
+}
+
+#[allow(dead_code)]
+impl BrowserMode {
+    pub fn name(&self) -> &'static str {
+        match self {
+            BrowserMode::TabsAndToolbar => "Вкладки и панель",
+            BrowserMode::SkipAll => "Пропуск",
+            BrowserMode::Full => "Полный",
+        }
+    }
+
+    pub fn from_id(id: usize) -> Self {
+        match id {
+            1 => BrowserMode::SkipAll,
+            2 => BrowserMode::Full,
+            _ => BrowserMode::TabsAndToolbar,
+        }
+    }
+
+    pub fn to_id(self) -> usize {
+        match self {
+            BrowserMode::TabsAndToolbar => 0,
+            BrowserMode::SkipAll => 1,
+            BrowserMode::Full => 2,
+        }
+    }
+}
+
+#[allow(dead_code)]
 pub struct AppConfig {
     pub preset: HotkeyPreset,
-    pub skip_browsers: bool,
+    pub browser_mode: BrowserMode,
     pub autostart: bool,
 }
 
@@ -61,7 +96,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             preset: HotkeyPreset::AltF,
-            skip_browsers: true,
+            browser_mode: BrowserMode::TabsAndToolbar,
             autostart: false,
         }
     }
@@ -83,8 +118,19 @@ impl AppConfig {
             if let Some(Ok(id)) = lines.first().map(|s| s.trim().parse::<usize>()) {
                 cfg.preset = HotkeyPreset::from_id(id);
             }
-            if let Some(Ok(skip)) = lines.get(1).map(|s| s.trim().parse::<bool>()) {
-                cfg.skip_browsers = skip;
+            if let Some(line) = lines.get(1) {
+                let trimmed = line.trim();
+                if let Ok(id) = trimmed.parse::<usize>() {
+                    cfg.browser_mode = BrowserMode::from_id(id);
+                } else if let Ok(skip) = trimmed.parse::<bool>() {
+                    // Backward compatibility with older bool format:
+                    // If true was "skip browsers", map to TabsAndToolbar (smart skip of DOM)
+                    cfg.browser_mode = if skip {
+                        BrowserMode::TabsAndToolbar
+                    } else {
+                        BrowserMode::Full
+                    };
+                }
             }
             if let Some(Ok(auto)) = lines.get(2).map(|s| s.trim().parse::<bool>()) {
                 cfg.autostart = auto;
@@ -99,9 +145,26 @@ impl AppConfig {
         let content = format!(
             "{}\n{}\n{}",
             self.preset.to_id(),
-            self.skip_browsers,
+            self.browser_mode.to_id(),
             self.autostart
         );
         let _ = fs::write(path, content);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_browser_mode_ids() {
+        assert_eq!(BrowserMode::TabsAndToolbar.to_id(), 0);
+        assert_eq!(BrowserMode::SkipAll.to_id(), 1);
+        assert_eq!(BrowserMode::Full.to_id(), 2);
+
+        assert_eq!(BrowserMode::from_id(0), BrowserMode::TabsAndToolbar);
+        assert_eq!(BrowserMode::from_id(1), BrowserMode::SkipAll);
+        assert_eq!(BrowserMode::from_id(2), BrowserMode::Full);
+        assert_eq!(BrowserMode::from_id(99), BrowserMode::TabsAndToolbar);
     }
 }

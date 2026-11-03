@@ -8,6 +8,7 @@ use windows::Win32::UI::Accessibility::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::*;
 
+use crate::core::config::BrowserMode;
 use crate::core::element::{Rect, UIElement};
 use crate::platform::AccessibilityBackend;
 
@@ -113,6 +114,7 @@ impl WindowsUia {
         &self,
         hwnd: HWND,
         is_taskbar: bool,
+        filter_browser_content: bool,
         results: &mut Vec<UIElement>,
         seen_rects: &mut HashSet<(i32, i32, i32, i32)>,
     ) -> Result<()> {
@@ -128,6 +130,15 @@ impl WindowsUia {
 
             if win_w < 30 || win_h < 20 {
                 return Ok(());
+            }
+
+            let mut content_rects: Vec<RECT> = Vec::new();
+            if filter_browser_content {
+                let _ = EnumChildWindows(
+                    hwnd,
+                    Some(enum_child_find_content),
+                    LPARAM(&mut content_rects as *mut _ as isize),
+                );
             }
 
             let root = match self.uia.ElementFromHandle(hwnd) {
@@ -171,7 +182,69 @@ impl WindowsUia {
                 let ctrl_type_id = elem.CachedControlType().map(|c| c.0).unwrap_or(0);
                 let name = elem.CachedName().unwrap_or_default().to_string();
 
-                if is_taskbar {
+                if filter_browser_content {
+                    // If element is the web document container itself (UIA_DocumentControlTypeId = 50030)
+                    if ctrl_type_id == 50030 {
+                        content_rects.push(rect);
+                        continue;
+                    }
+
+                    // Native browser UI doesn't use Hyperlinks (they belong to webpage DOM)
+                    if ctrl_type_id == 50005 {
+                        continue;
+                    }
+
+                    // Only allow browser UI components:
+                    // 50019: TabItem (tabs)
+                    // 50004: Edit (address bar / omnibox)
+                    // 50000: Button (back, forward, reload, new tab, extensions, profile, menu)
+                    // 50031: SplitButton
+                    // 50011: MenuItem
+                    let is_allowed_browser_ui = matches!(
+                        ctrl_type_id,
+                        50019 | 50004 | 50000 | 50031 | 50011
+                    );
+
+                    if !is_allowed_browser_ui {
+                        continue;
+                    }
+
+                    // Skip full-window container panes
+                    if w >= win_w - 20 && h >= win_h - 40 {
+                        continue;
+                    }
+
+                    // Check if inside target window bounds
+                    if rect.right <= win_rect.left
+                        || rect.left >= win_rect.right
+                        || rect.bottom <= win_rect.top
+                        || rect.top >= win_rect.bottom
+                    {
+                        continue;
+                    }
+
+                    // Filter out elements residing inside the web content viewport
+                    let cx = (rect.left + rect.right) / 2;
+                    let cy = (rect.top + rect.bottom) / 2;
+
+                    let in_web_content = content_rects.iter().any(|cr| {
+                        cx >= cr.left && cx <= cr.right && cy >= cr.top && cy <= cr.bottom
+                    });
+
+                    if in_web_content {
+                        continue;
+                    }
+
+                    // Fallback geometric filter if content_rects wasn't populated:
+                    // Top header chrome is within ~180px from window top; vertical tab strip within ~260px from window left.
+                    if content_rects.is_empty() {
+                        let is_in_top_chrome = rect.top < win_rect.top + 180;
+                        let is_in_side_chrome = rect.left < win_rect.left + 260;
+                        if !is_in_top_chrome && !is_in_side_chrome {
+                            continue;
+                        }
+                    }
+                } else if is_taskbar {
                     // Taskbar: only real buttons and menu items (Start, apps, volume, clock, tray items)
                     // Skip large toolbar/pane containers like (1621x40)
                     if (ctrl_type_id != 50000 && ctrl_type_id != 50011) || w > 300 {
@@ -268,12 +341,14 @@ impl WindowsUia {
     }
 
     /// Scans active window AND the system taskbar + tray simultaneously.
-    /// If `skip_browsers` is true and `target_hwnd` is a browser (Chrome, Edge, Yandex, etc.),
-    /// the browser's huge DOM tree is skipped, keeping only the Taskbar and Tray for instant response!
+    /// Handles browser windows according to the selected `BrowserMode`:
+    /// - `TabsAndToolbar`: scans tabs, address bar, navigation bar, while skipping web content
+    /// - `SkipAll`: skips browser window completely
+    /// - `Full`: scans the entire browser tree including web DOM
     pub fn get_elements_for_window(
         &self,
         target_hwnd: HWND,
-        skip_browsers: bool,
+        browser_mode: BrowserMode,
     ) -> Result<Vec<UIElement>> {
         let mut results = Vec::with_capacity(128);
         let mut seen_rects = HashSet::with_capacity(256);
@@ -281,13 +356,22 @@ impl WindowsUia {
         unsafe {
             let tray_hwnd = FindWindowW(w!("Shell_TrayWnd"), None).unwrap_or(HWND::default());
 
-            // 1. Scan target application window (skip if taskbar or if it's a browser with skip_browsers=true)
+            // 1. Scan target application window
             if !target_hwnd.0.is_null() && target_hwnd != tray_hwnd {
-                let is_browser = skip_browsers && Self::is_browser_window(target_hwnd);
-                if !is_browser {
+                let is_browser = Self::is_browser_window(target_hwnd);
+
+                let should_scan = match browser_mode {
+                    BrowserMode::SkipAll => !is_browser,
+                    BrowserMode::TabsAndToolbar | BrowserMode::Full => true,
+                };
+
+                if should_scan {
+                    let filter_browser_content =
+                        is_browser && browser_mode == BrowserMode::TabsAndToolbar;
                     let _ = self.scan_window_elements(
                         target_hwnd,
                         false,
+                        filter_browser_content,
                         &mut results,
                         &mut seen_rects,
                     );
@@ -296,14 +380,26 @@ impl WindowsUia {
 
             // 2. Scan primary taskbar + system tray (Sound, Clock, Pinned Apps, Start)
             if !tray_hwnd.0.is_null() {
-                let _ = self.scan_window_elements(tray_hwnd, true, &mut results, &mut seen_rects);
+                let _ = self.scan_window_elements(
+                    tray_hwnd,
+                    true,
+                    false,
+                    &mut results,
+                    &mut seen_rects,
+                );
             }
 
             // 3. Scan secondary taskbar (multi-monitor setups) if present
             let sec_tray =
                 FindWindowW(w!("Shell_SecondaryTrayWnd"), None).unwrap_or(HWND::default());
             if !sec_tray.0.is_null() && sec_tray != tray_hwnd {
-                let _ = self.scan_window_elements(sec_tray, true, &mut results, &mut seen_rects);
+                let _ = self.scan_window_elements(
+                    sec_tray,
+                    true,
+                    false,
+                    &mut results,
+                    &mut seen_rects,
+                );
             }
         }
 
@@ -311,11 +407,36 @@ impl WindowsUia {
     }
 }
 
+unsafe extern "system" fn enum_child_find_content(child: HWND, lparam: LPARAM) -> BOOL {
+    unsafe {
+        let mut class_buf = [0u16; 256];
+        let len = GetClassNameW(child, &mut class_buf);
+        if len > 0 {
+            let class_name = String::from_utf16_lossy(&class_buf[..len as usize]);
+            // Chromium web viewport: Chrome_RenderWidgetHostHWND
+            // Firefox web viewport: MozillaContentWindowClass
+            if class_name.contains("Chrome_RenderWidgetHostHWND")
+                || class_name.contains("MozillaContentWindowClass")
+            {
+                let mut r = RECT::default();
+                if GetWindowRect(child, &mut r).is_ok() {
+                    if r.right > r.left + 50 && r.bottom > r.top + 50 {
+                        let rects = &mut *(lparam.0 as *mut Vec<RECT>);
+                        rects.push(r);
+                    }
+                }
+            }
+        }
+        BOOL(1)
+    }
+}
+
 impl AccessibilityBackend for WindowsUia {
     fn get_interactive_elements(&self) -> Result<Vec<UIElement>> {
         unsafe {
             let fg = GetForegroundWindow();
-            self.get_elements_for_window(fg, true)
+            let config = crate::core::config::AppConfig::load();
+            self.get_elements_for_window(fg, config.browser_mode)
         }
     }
 }

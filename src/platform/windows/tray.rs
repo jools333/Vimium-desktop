@@ -7,7 +7,7 @@ use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::*;
 
-use crate::core::config::{AppConfig, HotkeyPreset};
+use crate::core::config::{AppConfig, BrowserMode, HotkeyPreset};
 use crate::core::hint::assign_hints;
 use crate::platform::windows::autostart;
 use crate::platform::windows::mouse::WindowsMouse;
@@ -24,10 +24,12 @@ const CMD_HOTKEY_ALT_F: usize = 3002;
 const CMD_HOTKEY_ALT_SPACE: usize = 3003;
 const CMD_HOTKEY_ALT_SEMI: usize = 3004;
 const CMD_HOTKEY_CTRL_SHIFT_F: usize = 3005;
-const CMD_TOGGLE_SKIP_BROWSERS: usize = 3006;
 const CMD_TOGGLE_AUTOSTART: usize = 3007;
 const CMD_CHECK_UPDATE: usize = 3008;
 const CMD_EXIT: usize = 3009;
+const CMD_BROWSER_TABS_TOOLBAR: usize = 3010;
+const CMD_BROWSER_SKIP_ALL: usize = 3011;
+const CMD_BROWSER_FULL: usize = 3012;
 
 struct TrayAppState {
     config: AppConfig,
@@ -148,7 +150,7 @@ impl TrayApplication {
 
             println!("Vimium Desktop started in system tray.");
             println!("Active hotkey: {}", app_state.config.preset.name());
-            println!("Skip browsers: {}", app_state.config.skip_browsers);
+            println!("Browser mode: {}", app_state.config.browser_mode.name());
 
             // Main tray message pump: runs continuously
             let mut msg = MSG::default();
@@ -193,10 +195,10 @@ fn trigger_vimium_hints() {
         let fg = GetForegroundWindow();
 
         // 1. High-speed scan: active window + taskbar (sound, clock, start, apps)
-        // Automatically skips browsers if skip_browsers is enabled!
+        // Respects browser_mode (smart exclusion of DOM, full skip, or full scan)
         let elements = match state
             .uia
-            .get_elements_for_window(fg, state.config.skip_browsers)
+            .get_elements_for_window(fg, state.config.browser_mode)
         {
             Ok(elems) if !elems.is_empty() => elems,
             _ => return,
@@ -268,17 +270,31 @@ unsafe extern "system" fn tray_wndproc(
                             register_current_hotkey(hwnd, state.config.preset);
                             update_tray_tip(state);
                         }
-                        CMD_TOGGLE_SKIP_BROWSERS => {
-                            state.config.skip_browsers = !state.config.skip_browsers;
+                        CMD_BROWSER_TABS_TOOLBAR => {
+                            state.config.browser_mode = BrowserMode::TabsAndToolbar;
                             state.config.save();
                             show_tray_notification(
                                 &mut state.nid,
                                 "Vimium Desktop",
-                                if state.config.skip_browsers {
-                                    "⚡ Пропуск браузеров включен"
-                                } else {
-                                    "Обход браузеров включен"
-                                },
+                                "🌐 В браузерах: вкладки и панель навигации (страницы исключены)",
+                            );
+                        }
+                        CMD_BROWSER_SKIP_ALL => {
+                            state.config.browser_mode = BrowserMode::SkipAll;
+                            state.config.save();
+                            show_tray_notification(
+                                &mut state.nid,
+                                "Vimium Desktop",
+                                "⚡ Пропуск браузеров включен",
+                            );
+                        }
+                        CMD_BROWSER_FULL => {
+                            state.config.browser_mode = BrowserMode::Full;
+                            state.config.save();
+                            show_tray_notification(
+                                &mut state.nid,
+                                "Vimium Desktop",
+                                "🔍 Сканирование браузера целиком (включая страницы)",
                             );
                         }
                         CMD_TOGGLE_AUTOSTART => {
@@ -417,21 +433,46 @@ unsafe fn show_tray_menu(hwnd: HWND) {
             PCWSTR(submenu_title.as_ptr()),
         );
 
-        // Browser toggle option
-        let browser_flags = if state.config.skip_browsers {
-            MF_STRING | MF_CHECKED
-        } else {
-            MF_STRING
+        // Browser mode selector submenu
+        let hbrowser_submenu = CreatePopupMenu().unwrap_or_default();
+        let check_browser_item = |mode: BrowserMode, cmd: usize, label: &str| {
+            let flags = if state.config.browser_mode == mode {
+                MF_STRING | MF_CHECKED
+            } else {
+                MF_STRING
+            };
+            let wide = label
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect::<Vec<_>>();
+            let _ = AppendMenuW(hbrowser_submenu, flags, cmd, PCWSTR(wide.as_ptr()));
         };
-        let browser_title = "⚡ Пропускать браузеры (Chrome, Edge и др.)"
+
+        check_browser_item(
+            BrowserMode::TabsAndToolbar,
+            CMD_BROWSER_TABS_TOOLBAR,
+            "⚡ Вкладки и панель навигации (Рекомендуется)",
+        );
+        check_browser_item(
+            BrowserMode::SkipAll,
+            CMD_BROWSER_SKIP_ALL,
+            "🚫 Пропускать браузеры полностью",
+        );
+        check_browser_item(
+            BrowserMode::Full,
+            CMD_BROWSER_FULL,
+            "🌐 Сканировать всё (включая страницы)",
+        );
+
+        let browser_submenu_title = format!("🌐 Браузеры ({})", state.config.browser_mode.name())
             .encode_utf16()
             .chain(std::iter::once(0))
             .collect::<Vec<_>>();
         let _ = AppendMenuW(
             hmenu,
-            browser_flags,
-            CMD_TOGGLE_SKIP_BROWSERS,
-            PCWSTR(browser_title.as_ptr()),
+            MF_POPUP,
+            hbrowser_submenu.0 as usize,
+            PCWSTR(browser_submenu_title.as_ptr()),
         );
 
         // Autostart toggle option
