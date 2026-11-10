@@ -98,13 +98,19 @@ impl TrayApplication {
             } else if !config.autostart && registry_autostart {
                 config.autostart = true;
             }
+            let h_instance = windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap_or_default();
+            #[allow(clippy::manual_dangling_ptr)]
+            let icon_id = PCWSTR(1 as *const u16);
+            let h_icon = LoadIconW(h_instance, icon_id)
+                .or_else(|_| LoadIconW(None, IDI_APPLICATION))?;
+
             let mut nid = NOTIFYICONDATAW {
                 cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
                 hWnd: hwnd,
                 uID: 1,
                 uFlags: NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_INFO,
                 uCallbackMessage: WM_TRAY_CALLBACK,
-                hIcon: LoadIconW(None, IDI_APPLICATION)?,
+                hIcon: h_icon,
                 ..Default::default()
             };
 

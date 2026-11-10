@@ -38,6 +38,86 @@
 
 ---
 
+## 📦 Установка
+
+### Windows (Рекомендуется — через инсталлятор)
+1. Скачайте **`vimium-desktop-windows-x86_64-setup.exe`** из раздела [**Releases**](https://github.com/jools333/Vimium-desktop/releases/latest).
+2. Запустите инсталлятор и следуйте подсказкам мастера установки:
+   - **Без прав администратора**: приложение устанавливается в стандартную пользовательскую папку (`%LOCALAPPDATA%\Programs\Vimium-desktop`), не вызывая раздражающих запросов UAC.
+   - **Ярлыки**: автоматически создает ярлыки в меню «Пуск» и на Рабочем столе (с возможностью отключения).
+   - **Автозапуск**: опция запуска вместе с Windows прямо на этапе установки.
+   - **Чистое удаление**: регистрируется в «Параметры Windows → Приложения → Установленные приложения» со встроенным деинсталлятором.
+   - **Тихая установка**: поддерживается ключ `/S` для автоматического развертывания.
+
+#### Портативная версия (Portable):
+Если установка не требуется, скачайте архив **`vimium-desktop-windows-x86_64.zip`** или файл **`vimium-desktop-windows-x86_64.exe`**, поместите в любую папку и запустите.
+
+### Linux (Ubuntu / Debian / Linux Mint / Pop!_OS и др.)
+
+#### Вариант 1: Установка через `.deb` пакет (Рекомендуется)
+1. Скачайте пакет **`vimium-desktop_<версия>_amd64.deb`** из раздела [**Releases**](https://github.com/jools333/Vimium-desktop/releases/latest).
+2. Установите пакет через терминал:
+   ```bash
+   sudo apt install ./vimium-desktop_*_amd64.deb
+   # или через dpkg:
+   # sudo dpkg -i vimium-desktop_*_amd64.deb
+   ```
+   Пакет автоматически установит:
+   - Исполняемый файл в `/usr/bin/vimium-desktop`
+   - Ярлык приложения в систему (`/usr/share/applications/vimium-desktop.desktop`)
+   - Иконки в тему `hicolor` и `pixmaps`
+3. Запуск доступен из меню приложений системы или командой `vimium-desktop`.
+4. Для удаления пакета:
+   ```bash
+   sudo apt remove vimium-desktop
+   ```
+
+#### Вариант 2: Портативный бинарник (.tar.gz):
+1. Скачайте архив **`vimium-desktop-linux-x86_64.tar.gz`** со страницы релизов.
+2. Распакуйте и запустите:
+   ```bash
+   tar -xzf vimium-desktop-linux-x86_64.tar.gz
+   chmod +x vimium-desktop-linux-x86_64
+   ./vimium-desktop-linux-x86_64
+   ```
+
+---
+
+## 🛠 Сборка из исходного кода
+
+### Windows (PowerShell)
+В репозитории подготовлены PowerShell-скрипты для автоматической компиляции и сборки Windows-инсталлятора:
+
+```powershell
+# Сборка релизной версии и упаковка готового Windows-инсталлятора (.exe setup)
+.\scripts\build-windows.ps1
+
+# Сборка только инсталлятора из уже скомпилированного бинарного файла:
+.\scripts\build-installer.ps1
+
+# Сборка отладочной (debug) версии без инсталлятора:
+.\scripts\build-windows.ps1 -Debug -SkipInstaller
+```
+Готовый инсталлятор сохраняется по пути: `dist\vimium-desktop-windows-x86_64-setup.exe`.
+
+### Linux (Bash)
+Для сборки приложения и формирования `.deb` пакета на Linux / Ubuntu:
+
+```bash
+# 1. Установка необходимых библиотек:
+sudo apt-get update && sudo apt-get install -y build-essential pkg-config libdbus-1-dev
+
+# 2. Полная сборка релизной версии и сборка deb-пакета:
+chmod +x scripts/*.sh
+./scripts/build-linux.sh
+
+# Или только упаковка deb-пакета из скомпилированного бинарника:
+./scripts/build-deb.sh
+```
+Готовый пакет будет находиться в папке `dist/vimium-desktop_<версия>_amd64.deb`.
+
+---
+
 ## 🚀 Запуск
 
 ### Основной режим (в системном трее):

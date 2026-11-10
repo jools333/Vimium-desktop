@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Vimium Desktop
+GenericName=Keyboard Navigation Tool
+Comment=Vimium-like keyboard navigation for desktop applications
+Exec=vimium-desktop
+Icon=vimium-desktop
+Terminal=false
+Type=Application
+Categories=Utility;Accessibility;
+StartupNotify=false
+Keywords=vim;vimium;keyboard;accessibility;navigation;

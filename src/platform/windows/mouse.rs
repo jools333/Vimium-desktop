@@ -18,10 +18,10 @@ impl MouseBackend for WindowsMouse {
     fn click_at(&self, x: i32, y: i32) -> Result<()> {
         unsafe {
             // 1. First try programmatic activation via UI Automation (cursor never moves!)
-            if let Ok(uia) = WindowsUia::new() {
-                if let Ok(true) = uia.activate_at(x, y) {
-                    return Ok(());
-                }
+            if let Ok(uia) = WindowsUia::new()
+                && let Ok(true) = uia.activate_at(x, y)
+            {
+                return Ok(());
             }
 
             // 2. Hardware click fallback: save original cursor position so cursor stays in place

@@ -31,39 +31,35 @@ impl WindowsUia {
             };
 
             // 1. Try InvokePattern (buttons, links, menu items)
-            if let Ok(pattern) = elem.GetCurrentPattern(UIA_InvokePatternId) {
-                if let Ok(invoke) = pattern.cast::<IUIAutomationInvokePattern>() {
-                    if invoke.Invoke().is_ok() {
-                        return Ok(true);
-                    }
-                }
+            if let Ok(pattern) = elem.GetCurrentPattern(UIA_InvokePatternId)
+                && let Ok(invoke) = pattern.cast::<IUIAutomationInvokePattern>()
+                && invoke.Invoke().is_ok()
+            {
+                return Ok(true);
             }
 
             // 2. Try SelectionItemPattern (tabs, list items, radio buttons)
-            if let Ok(pattern) = elem.GetCurrentPattern(UIA_SelectionItemPatternId) {
-                if let Ok(sel) = pattern.cast::<IUIAutomationSelectionItemPattern>() {
-                    if sel.Select().is_ok() {
-                        return Ok(true);
-                    }
-                }
+            if let Ok(pattern) = elem.GetCurrentPattern(UIA_SelectionItemPatternId)
+                && let Ok(sel) = pattern.cast::<IUIAutomationSelectionItemPattern>()
+                && sel.Select().is_ok()
+            {
+                return Ok(true);
             }
 
             // 3. Try TogglePattern (checkboxes, toggle buttons)
-            if let Ok(pattern) = elem.GetCurrentPattern(UIA_TogglePatternId) {
-                if let Ok(toggle) = pattern.cast::<IUIAutomationTogglePattern>() {
-                    if toggle.Toggle().is_ok() {
-                        return Ok(true);
-                    }
-                }
+            if let Ok(pattern) = elem.GetCurrentPattern(UIA_TogglePatternId)
+                && let Ok(toggle) = pattern.cast::<IUIAutomationTogglePattern>()
+                && toggle.Toggle().is_ok()
+            {
+                return Ok(true);
             }
 
             // 4. Try ExpandCollapsePattern (drop-downs, expandable tree items)
-            if let Ok(pattern) = elem.GetCurrentPattern(UIA_ExpandCollapsePatternId) {
-                if let Ok(expand) = pattern.cast::<IUIAutomationExpandCollapsePattern>() {
-                    if expand.Expand().is_ok() {
-                        return Ok(true);
-                    }
-                }
+            if let Ok(pattern) = elem.GetCurrentPattern(UIA_ExpandCollapsePatternId)
+                && let Ok(expand) = pattern.cast::<IUIAutomationExpandCollapsePattern>()
+                && expand.Expand().is_ok()
+            {
+                return Ok(true);
             }
 
             // 5. Try SetFocus (for edit controls / address bars)
@@ -479,11 +475,12 @@ unsafe extern "system" fn enum_child_find_content(child: HWND, lparam: LPARAM) -
                 || class_name.contains("MozillaContentWindowClass")
             {
                 let mut r = RECT::default();
-                if GetWindowRect(child, &mut r).is_ok() {
-                    if r.right > r.left + 50 && r.bottom > r.top + 50 {
-                        let rects = &mut *(lparam.0 as *mut Vec<RECT>);
-                        rects.push(r);
-                    }
+                if GetWindowRect(child, &mut r).is_ok()
+                    && r.right > r.left + 50
+                    && r.bottom > r.top + 50
+                {
+                    let rects = &mut *(lparam.0 as *mut Vec<RECT>);
+                    rects.push(r);
                 }
             }
         }

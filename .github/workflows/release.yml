@@ -63,6 +63,13 @@ jobs:
           Copy-Item "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" -Destination "dist/${{ matrix.asset_name }}"
           Compress-Archive -Path "dist/${{ matrix.asset_name }}" -DestinationPath "dist/vimium-desktop-windows-x86_64.zip"
 
+          # Build Windows NSIS Installer (.exe setup)
+          $binPath = (Resolve-Path "target/${{ matrix.target }}/release/${{ matrix.binary_name }}").Path
+          $setupExe = (Join-Path (Resolve-Path "dist").Path "vimium-desktop-windows-x86_64-setup.exe")
+          $tagVersion = "${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}".TrimStart("vV")
+          if (-not $tagVersion) { $tagVersion = "0.3.1" }
+          makensis /DVERSION="$tagVersion" "/DSOURCE_EXE=$binPath" "/DOUT_FILE=$setupExe" installer/installer.nsi
+
       - name: Package Linux assets
         if: runner.os == 'Linux'
         run: |
@@ -70,6 +77,11 @@ jobs:
           cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "dist/${{ matrix.asset_name }}"
           chmod +x "dist/${{ matrix.asset_name }}"
           tar -czf "dist/vimium-desktop-linux-x86_64.tar.gz" -C dist "${{ matrix.asset_name }}"
+
+          # Build Debian package (.deb)
+          TAG_VERSION="${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}"
+          chmod +x scripts/build-deb.sh
+          ./scripts/build-deb.sh "$TAG_VERSION" "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" dist
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
@@ -99,7 +111,7 @@ jobs:
         working-directory: dist
         run: |
           sha256sum * > SHA256SUMS.txt
-          echo "Automated release of **Vimium Desktop** for Windows and Linux (x86_64)." > ../notes.txt
+          echo "Automated release of **Vimium Desktop** for Windows (Installer .exe / Portable .zip) and Linux (.deb / .tar.gz)." > ../notes.txt
           echo "" >> ../notes.txt
           echo "### Checksums (SHA-256)" >> ../notes.txt
           echo '```' >> ../notes.txt
