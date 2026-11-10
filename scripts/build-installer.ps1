@@ -32,9 +32,9 @@ foreach ($path in $possiblePaths) {
 }
 
 if (-not $makensis) {
-    $cmd = Get-Command "makensis.exe" -ErrorAction SilentlyContinue
+    $cmd = Get-Command "makensis" -ErrorAction SilentlyContinue
     if ($cmd) {
-        $makensis = $cmd.Source
+        $makensis = if ($cmd.Source) { $cmd.Source } else { $cmd.Path }
     }
 }
 

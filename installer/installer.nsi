@@ -27,9 +27,10 @@
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
 !include "LogicLib.nsh"
+!include "x64.nsh"
 
-; 64-bit architecture
-Target amd64-unicode
+; Modern Unicode installer
+Unicode true
 
 ; General Configuration
 Name "${PRODUCT_NAME}"

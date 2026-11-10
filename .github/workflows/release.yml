@@ -47,6 +47,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Setup NSIS (Windows)
+        if: runner.os == 'Windows'
+        uses: nsis-dev/setup-nsis@v1
+        with:
+          version: "latest"
+
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -66,9 +72,7 @@ jobs:
           # Build Windows NSIS Installer (.exe setup)
           $binPath = (Resolve-Path "target/${{ matrix.target }}/release/${{ matrix.binary_name }}").Path
           $setupExe = (Join-Path (Resolve-Path "dist").Path "vimium-desktop-windows-x86_64-setup.exe")
-          $tagVersion = "${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}".TrimStart("vV")
-          if (-not $tagVersion) { $tagVersion = "0.3.1" }
-          makensis /DVERSION="$tagVersion" "/DSOURCE_EXE=$binPath" "/DOUT_FILE=$setupExe" installer/installer.nsi
+          & .\scripts\build-installer.ps1 -Configuration release -BinaryPath "$binPath" -OutputPath "$setupExe"
 
       - name: Package Linux assets
         if: runner.os == 'Linux'
